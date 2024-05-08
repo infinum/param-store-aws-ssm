@@ -7,100 +7,62 @@
 [![Coverage](./badges/coverage.svg)](./badges/coverage.svg)
 
 Based on a TypeScript Action
-[template](https://github.com/actions/typescript-action)
+[template](https://github.com/actions/typescript-action).
 
 ## Initial Setup
 
-> [!NOTE]
->
-> You'll need to have a reasonably modern version of
-> [Node.js](https://nodejs.org) handy (20.x or later should work!). If you are
-> using a version manager like [`nodenv`](https://github.com/nodenv/nodenv) or
-> [`nvm`](https://github.com/nvm-sh/nvm), this template has a `.node-version`
-> file at the root of the repository that will be used to automatically switch
-> to the correct version when you `cd` into the repository. Additionally, this
-> `.node-version` file is used by GitHub Actions in any `actions/setup-node`
-> actions.
-
-1. Run the setup script
+Install recent version of node and run the setup script
 
 ```bash
 script/setup
 ```
 
-2. Run the tests
+Run the test suite
 
 ```bash
 npm test
 ```
 
-# Updating action
+## Updating action
 
-1. Create a new branch
+Create a new branch
 
-   ```bash
-   git checkout -b releases/v1
-   ```
+```bash
+git checkout -b releases/v1
+```
 
-1. Replace the contents of `src/` with your action code
-1. Add tests to `__tests__/` for your source code
-1. Format, test, and build the action
+Update action code (`src/`) and add tests (`__tests__/`)
 
-   ```bash
-   npm run all
-   ```
+Format, test, and build the action
 
-   > This step is important! It will run [`ncc`](https://github.com/vercel/ncc)
-   > to build the final JavaScript action code with all dependencies included.
-   > If you do not run this step, your action will not work correctly when it is
-   > used in a workflow. This step also includes the `--license` option for
-   > `ncc`, which will create a license file for all of the production node
-   > modules used in your project.
+```bash
+npm run all
+```
 
-1. Commit your changes
+> This step is important! It will run [`ncc`](https://github.com/vercel/ncc)
+> to build the final JavaScript action code with all dependencies included.
+> If you do not run this step, your action will not work correctly when it is
+> used in a workflow. This step also includes the `--license` option for
+> `ncc`, which will create a license file for all of the production node
+> modules used in your project.
 
-   ```bash
-   git add .
-   git commit -m "My first action is ready!"
-   ```
+Commit your changes
 
-1. Push them to your repository
+Push them to your repository
 
-   ```bash
-   git push -u origin releases/v1
-   ```
+```bash
+git push -u origin releases/v1
+```
 
-1. Create a pull request and get feedback on your action
-1. Merge the pull request into the `main` branch
+Create a pull request and get feedback on your action
+
+Merge the pull request into the `main` branch
 
 Your action is now published!
 
 For information about versioning your action, see
 [Versioning](https://github.com/actions/toolkit/blob/master/docs/action-versioning.md)
 in the GitHub Actions toolkit.
-
-## Validate the Action
-
-You can now validate the action by referencing it in a workflow file. For
-example, [`ci.yml`](./.github/workflows/ci.yml) demonstrates how to reference an
-action in the same repository.
-
-```yaml
-steps:
-  - name: Checkout
-    id: checkout
-    uses: actions/checkout@v4
-
-  - name: Test Local Action
-    id: test-action
-    uses: ./
-    with:
-      milliseconds: 1000
-
-  - name: Print Output
-    id: output
-    run: echo "${{ steps.test-action.outputs.time }}"
-```
 
 ## Publishing a New Release
 
