@@ -1,5 +1,13 @@
 import * as core from '@actions/core'
-import { wait } from './wait'
+import { SSMClient, GetParametersByPathCommand } from '@aws-sdk/client-ssm'
+import { writeFileSync } from 'fs'
+
+const EMPTY_STRING = ''
+const NEWLINE = '\n'
+const PARAMETER_VALUE_NULL = 'null'
+const FILE_FLAG_WRITE = 'w'
+export const PARAMS_FILE = 'params.txt'
+export const OUTPUT_PARAM_FILE = 'file'
 
 /**
  * The main function for the action.
@@ -7,20 +15,41 @@ import { wait } from './wait'
  */
 export async function run(): Promise<void> {
   try {
-    const ms: string = core.getInput('milliseconds')
+    const path: string = core.getInput('path')
 
-    // Debug logs are only output if the `ACTIONS_STEP_DEBUG` secret is true
-    core.debug(`Waiting ${ms} milliseconds ...`)
+    const client = new SSMClient()
+    const input = {
+      Path: path,
+      WithDecryption: true
+    }
+    const command = new GetParametersByPathCommand(input)
+    const response = await client.send(command)
 
-    // Log the current timestamp, wait, then log the new timestamp
-    core.debug(new Date().toTimeString())
-    await wait(parseInt(ms, 10))
-    core.debug(new Date().toTimeString())
+    let paramItems: string[] = []
+    if (response.Parameters !== undefined) {
+      paramItems = response.Parameters.map((parameter): string => {
+        if (parameter.Name) {
+          const paramItemName = parameter.Name.replace(
+            path,
+            EMPTY_STRING
+          ).toUpperCase()
 
-    // Set outputs for other workflow steps to use
-    core.setOutput('time', new Date().toTimeString())
+          if (parameter.Value === PARAMETER_VALUE_NULL) {
+            return EMPTY_STRING
+          } else {
+            return `${paramItemName}=${parameter.Value}`
+          }
+        } else {
+          return EMPTY_STRING
+        }
+      }).filter(paramItem => paramItem !== EMPTY_STRING)
+    }
+
+    writeFileSync(PARAMS_FILE, paramItems.join(NEWLINE), {
+      flag: FILE_FLAG_WRITE
+    })
+    core.setOutput(OUTPUT_PARAM_FILE, PARAMS_FILE)
   } catch (error) {
-    // Fail the workflow run if an error occurs
     if (error instanceof Error) core.setFailed(error.message)
   }
 }

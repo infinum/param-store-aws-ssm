@@ -1,44 +1,36 @@
-/**
- * Unit tests for the action's main functionality, src/main.ts
- *
- * These should be run as if the action was called from a workflow.
- * Specifically, the inputs listed in `action.yml` should be set as environment
- * variables following the pattern `INPUT_<INPUT_NAME>`.
- */
-
 import * as core from '@actions/core'
 import * as main from '../src/main'
+import { mockClient } from 'aws-sdk-client-mock'
+import { SSMClient, GetParametersByPathCommand } from '@aws-sdk/client-ssm'
+import { rmSync, readFileSync } from 'fs'
 
-// Mock the action's main function
 const runMock = jest.spyOn(main, 'run')
 
-// Other utilities
-const timeRegex = /^\d{2}:\d{2}:\d{2}/
-
-// Mock the GitHub Actions core library
-let debugMock: jest.SpiedFunction<typeof core.debug>
 let errorMock: jest.SpiedFunction<typeof core.error>
 let getInputMock: jest.SpiedFunction<typeof core.getInput>
-let setFailedMock: jest.SpiedFunction<typeof core.setFailed>
 let setOutputMock: jest.SpiedFunction<typeof core.setOutput>
+const ssmClientMock = mockClient(SSMClient)
 
 describe('action', () => {
   beforeEach(() => {
     jest.clearAllMocks()
 
-    debugMock = jest.spyOn(core, 'debug').mockImplementation()
     errorMock = jest.spyOn(core, 'error').mockImplementation()
     getInputMock = jest.spyOn(core, 'getInput').mockImplementation()
-    setFailedMock = jest.spyOn(core, 'setFailed').mockImplementation()
     setOutputMock = jest.spyOn(core, 'setOutput').mockImplementation()
+    ssmClientMock.reset()
+
+    rmSync(main.OUTPUT_PARAM_FILE, { force: true })
   })
 
-  it('sets the time output', async () => {
-    // Set the action's inputs as return values from core.getInput()
+  it('sets the file output', async () => {
+    ssmClientMock.on(GetParametersByPathCommand).resolves({
+      Parameters: []
+    })
     getInputMock.mockImplementation(name => {
       switch (name) {
-        case 'milliseconds':
-          return '500'
+        case 'path':
+          return '/some/path'
         default:
           return ''
       }
@@ -47,30 +39,22 @@ describe('action', () => {
     await main.run()
     expect(runMock).toHaveReturned()
 
-    // Verify that all of the core library functions were called correctly
-    expect(debugMock).toHaveBeenNthCalledWith(1, 'Waiting 500 milliseconds ...')
-    expect(debugMock).toHaveBeenNthCalledWith(
-      2,
-      expect.stringMatching(timeRegex)
-    )
-    expect(debugMock).toHaveBeenNthCalledWith(
-      3,
-      expect.stringMatching(timeRegex)
-    )
     expect(setOutputMock).toHaveBeenNthCalledWith(
       1,
-      'time',
-      expect.stringMatching(timeRegex)
+      main.OUTPUT_PARAM_FILE,
+      main.PARAMS_FILE
     )
     expect(errorMock).not.toHaveBeenCalled()
   })
 
-  it('sets a failed status', async () => {
-    // Set the action's inputs as return values from core.getInput()
+  it('creates params file', async () => {
+    ssmClientMock.on(GetParametersByPathCommand).resolves({
+      Parameters: [{ Name: 'param', Value: 'value' }]
+    })
     getInputMock.mockImplementation(name => {
       switch (name) {
-        case 'milliseconds':
-          return 'this is not a number'
+        case 'path':
+          return '/some/path'
         default:
           return ''
       }
@@ -79,11 +63,37 @@ describe('action', () => {
     await main.run()
     expect(runMock).toHaveReturned()
 
-    // Verify that all of the core library functions were called correctly
-    expect(setFailedMock).toHaveBeenNthCalledWith(
-      1,
-      'milliseconds not a number'
-    )
+    const content = readFileSync(main.PARAMS_FILE, {
+      encoding: 'utf8',
+      flag: 'r'
+    })
+    expect(content).toEqual('PARAM=value')
+  })
+
+  it('skips parameters with null values', async () => {
+    ssmClientMock.on(GetParametersByPathCommand).resolves({
+      Parameters: [
+        { Name: 'param', Value: 'value' },
+        { Name: 'other', Value: 'null' }
+      ]
+    })
+    getInputMock.mockImplementation(name => {
+      switch (name) {
+        case 'path':
+          return '/some/path'
+        default:
+          return ''
+      }
+    })
+
+    await main.run()
+    expect(runMock).toHaveReturned()
+
+    const content = readFileSync(main.PARAMS_FILE, {
+      encoding: 'utf8',
+      flag: 'r'
+    })
+    expect(content).not.toContain('OTHER')
     expect(errorMock).not.toHaveBeenCalled()
   })
 })
