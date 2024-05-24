@@ -56264,7 +56264,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.run = exports.OUTPUT_PARAM_FILE = exports.PARAMS_FILE = void 0;
+exports.run = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const client_ssm_1 = __nccwpck_require__(341);
 const fs_1 = __nccwpck_require__(7147);
@@ -56272,8 +56272,6 @@ const EMPTY_STRING = '';
 const NEWLINE = '\n';
 const PARAMETER_VALUE_NULL = 'null';
 const FILE_FLAG_WRITE = 'w';
-exports.PARAMS_FILE = 'params.txt';
-exports.OUTPUT_PARAM_FILE = 'file';
 /**
  * The main function for the action.
  * @returns {Promise<void>} Resolves when the action is complete.
@@ -56281,34 +56279,14 @@ exports.OUTPUT_PARAM_FILE = 'file';
 async function run() {
     try {
         const path = core.getInput('path');
-        const client = new client_ssm_1.SSMClient();
-        const input = {
-            Path: path,
-            WithDecryption: true
-        };
-        const command = new client_ssm_1.GetParametersByPathCommand(input);
-        const response = await client.send(command);
-        let paramItems = [];
-        if (response.Parameters !== undefined) {
-            paramItems = response.Parameters.map((parameter) => {
-                if (parameter.Name) {
-                    const paramItemName = parameter.Name.replace(path, EMPTY_STRING).toUpperCase();
-                    if (parameter.Value === PARAMETER_VALUE_NULL) {
-                        return EMPTY_STRING;
-                    }
-                    else {
-                        return `${paramItemName}=${parameter.Value}`;
-                    }
-                }
-                else {
-                    return EMPTY_STRING;
-                }
-            }).filter(paramItem => paramItem !== EMPTY_STRING);
-        }
-        (0, fs_1.writeFileSync)(exports.PARAMS_FILE, paramItems.join(NEWLINE), {
+        const file = core.getInput('file');
+        const parameters = await fetchParameters(path);
+        const paramItems = parameters
+            .map(parameter => parameterToEnvItem(parameter, path))
+            .filter(paramItem => paramItem !== EMPTY_STRING);
+        (0, fs_1.writeFileSync)(file, paramItems.join(NEWLINE), {
             flag: FILE_FLAG_WRITE
         });
-        core.setOutput(exports.OUTPUT_PARAM_FILE, exports.PARAMS_FILE);
     }
     catch (error) {
         if (error instanceof Error)
@@ -56316,6 +56294,43 @@ async function run() {
     }
 }
 exports.run = run;
+async function fetchParameters(path) {
+    const client = new client_ssm_1.SSMClient();
+    let parameters = [];
+    let batchIndex = 1;
+    let nextToken = undefined;
+    let response;
+    do {
+        response = await fetchParameterBatch(client, path, nextToken, batchIndex);
+        if (response.Parameters)
+            parameters = [...parameters, ...response.Parameters];
+        nextToken = response.NextToken;
+        batchIndex++;
+    } while (nextToken);
+    return parameters;
+}
+async function fetchParameterBatch(client, path, nextToken, batchIndex) {
+    const input = {
+        Path: path,
+        WithDecryption: true,
+        NextToken: nextToken
+    };
+    core.debug(`Fetching parameters batch: ${batchIndex}`);
+    const command = new client_ssm_1.GetParametersByPathCommand(input);
+    return await client.send(command);
+}
+function parameterToEnvItem(parameter, path) {
+    if (!parameter.Name)
+        return EMPTY_STRING;
+    const paramItemName = parameter.Name.replace(path, EMPTY_STRING).toUpperCase();
+    if (parameter.Value === PARAMETER_VALUE_NULL) {
+        core.debug(`[${parameter.Name}]: null value detected, skip`);
+        return EMPTY_STRING;
+    }
+    else {
+        return `${paramItemName}=${parameter.Value}`;
+    }
+}
 
 
 /***/ }),
