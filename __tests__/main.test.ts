@@ -8,8 +8,9 @@ const runMock = jest.spyOn(main, 'run')
 
 let errorMock: jest.SpiedFunction<typeof core.error>
 let getInputMock: jest.SpiedFunction<typeof core.getInput>
-let setOutputMock: jest.SpiedFunction<typeof core.setOutput>
 const ssmClientMock = mockClient(SSMClient)
+
+const OUTPUT_PARAM_FILE = 'params.txt'
 
 describe('action', () => {
   beforeEach(() => {
@@ -17,10 +18,9 @@ describe('action', () => {
 
     errorMock = jest.spyOn(core, 'error').mockImplementation()
     getInputMock = jest.spyOn(core, 'getInput').mockImplementation()
-    setOutputMock = jest.spyOn(core, 'setOutput').mockImplementation()
     ssmClientMock.reset()
 
-    rmSync(main.OUTPUT_PARAM_FILE, { force: true })
+    rmSync(OUTPUT_PARAM_FILE, { force: true })
   })
 
   it('sets the file output', async () => {
@@ -31,6 +31,8 @@ describe('action', () => {
       switch (name) {
         case 'path':
           return '/some/path'
+        case 'file':
+          return OUTPUT_PARAM_FILE
         default:
           return ''
       }
@@ -38,12 +40,6 @@ describe('action', () => {
 
     await main.run()
     expect(runMock).toHaveReturned()
-
-    expect(setOutputMock).toHaveBeenNthCalledWith(
-      1,
-      main.OUTPUT_PARAM_FILE,
-      main.PARAMS_FILE
-    )
     expect(errorMock).not.toHaveBeenCalled()
   })
 
@@ -55,6 +51,8 @@ describe('action', () => {
       switch (name) {
         case 'path':
           return '/some/path'
+        case 'file':
+          return OUTPUT_PARAM_FILE
         default:
           return ''
       }
@@ -63,7 +61,7 @@ describe('action', () => {
     await main.run()
     expect(runMock).toHaveReturned()
 
-    const content = readFileSync(main.PARAMS_FILE, {
+    const content = readFileSync(OUTPUT_PARAM_FILE, {
       encoding: 'utf8',
       flag: 'r'
     })
@@ -81,6 +79,8 @@ describe('action', () => {
       switch (name) {
         case 'path':
           return '/some/path'
+        case 'file':
+          return OUTPUT_PARAM_FILE
         default:
           return ''
       }
@@ -89,7 +89,7 @@ describe('action', () => {
     await main.run()
     expect(runMock).toHaveReturned()
 
-    const content = readFileSync(main.PARAMS_FILE, {
+    const content = readFileSync(OUTPUT_PARAM_FILE, {
       encoding: 'utf8',
       flag: 'r'
     })

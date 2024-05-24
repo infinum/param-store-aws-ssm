@@ -10,10 +10,9 @@ inputs:
   path:
     description: The hierarchy for the parameter
     required: true
-
-outputs:
   file:
-    description: Params file
+    description: Path to parameters file
+    required: true
 
 runs:
   using: node20
